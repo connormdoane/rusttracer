@@ -5,8 +5,26 @@ pub struct Vec3<T> {
     pub z: T,
 }
 
+#[derive(Clone, Copy)]
+pub struct Vec2<T> {
+    pub x: T,
+    pub y: T,
+}
+
+#[derive(Clone, Copy)]
+pub struct Vec4<T> {
+    pub x: T,
+    pub y: T,
+    pub z: T,
+    pub a: T,
+}
+
+pub type Vec2f = Vec2<f64>;
+
 pub type Vec3f = Vec3<f64>;
 pub type Vec3i = Vec3<i64>;
+
+pub type Vec4f = Vec4<f64>;
 
 impl<T> PartialEq for Vec3<T> where T: PartialEq {
     fn eq(&self, other: &Self) -> bool {
@@ -32,6 +50,30 @@ impl<T> std::ops::Index<usize> for Vec3<T> {
 	    0 => &self.x,
 	    1 => &self.y,
 	    _ => &self.z,
+	}
+    }
+}
+
+impl<T> std::ops::Index<usize> for Vec2<T> {
+    type Output = T;
+
+    fn index(&self, xy: usize) -> &Self::Output {
+	match xy {
+	    0 => &self.x,
+	    _ => &self.y,
+	}
+    }
+}
+
+impl<T> std::ops::Index<usize> for Vec4<T> {
+    type Output = T;
+
+    fn index(&self, xy: usize) -> &Self::Output {
+	match xy {
+	    0 => &self.x,
+	    1 => &self.y,
+	    2 => &self.z,
+	    _ => &self.a,
 	}
     }
 }
@@ -76,4 +118,8 @@ impl Vec3f {
 	let op: Vec3f = Vec3f{x: self.x*(1./norm), y: self.y*(1./norm), z: self.z*(1./norm)};
 	op
     }
+
+    pub fn norm(self) -> f64 {
+	f64::sqrt(self.x*self.x+self.y*self.y+self.z*self.z)
+    } 
 }
