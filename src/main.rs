@@ -266,7 +266,7 @@ fn main() -> std::io::Result<()> {
 //    assert!(test1.clone()+test2.clone() == geometry::Vec3i{x: 7, y: 7, z: 7});
 //    assert!(test1.clone()-test2.clone() == geometry::Vec3i{x: 3, y: 3, z: 3});
 
-    let env_file_path = "envmaps/parsed_bank.ppm";
+    let env_file_path = "envmaps/parsed_mountain.ppm";
     let envmap: Vec<geometry::Vec3f> = build_envmap(env_file_path);
 //    let _file = save_to_file("envmap_output.ppm", envmap);
     
