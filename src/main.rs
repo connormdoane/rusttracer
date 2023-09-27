@@ -225,6 +225,7 @@ fn main() -> std::io::Result<()> {
     spheres.push(get_sphere(vec3f(4., -0.5, -18.), 3., red_rubber()));
     spheres.push(get_sphere(vec3f(-14., 9., -19.), 9., mirror()));
     spheres.push(get_sphere(vec3f(0., 8., -22.), 4., mirror()));
+    spheres.push(get_sphere(vec3f(0., -1., -25.), 3., red_rubber()));
 
     let mut lights: Vec<Light> = vec![];
     lights.push(get_light(vec3f(-20., 20., 20.), 1.5));
