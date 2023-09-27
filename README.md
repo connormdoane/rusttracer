@@ -2,6 +2,8 @@
 
 Implementation of ray-tracing algorithms in Rust, based on ssloy's tinyraytracer lectures
 
+![an example output image](https://github.com/connormdoane/rusttracer/blob/master/output.png)
+
 ### Implementations:
 - Collision:
 http://www.lighthouse3d.com/tutorials/maths/ray-sphere-intersection/
