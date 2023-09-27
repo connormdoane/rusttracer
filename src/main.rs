@@ -1,10 +1,13 @@
 #![allow(unused_assignments)]
+use num;
 use std::fs::File;
 use std::io::prelude::*;
 pub mod geometry;
 
 const WIDTH: u32 = 1024;
 const HEIGHT: u32 = 768;
+const ENVMAP_WIDTH: u32 = 4096;
+const ENVMAP_HEIGHT: u32 = 2048;
 const FOV: f64 = 0.5;
 
 fn vec3f(x0: f64, y0: f64, z0: f64) -> geometry::Vec3f {
@@ -130,21 +133,24 @@ fn scene_intersect(orig: geometry::Vec3f, dir: geometry::Vec3f, spheres: &mut Ve
     f64::min(spheres_dist, checkerboard_dist) < 1000.
 }
 
-fn cast_ray(orig: geometry::Vec3f, dir: geometry::Vec3f, spheres: &mut Vec<Sphere>, lights: &mut Vec<Light>, depth: usize) -> geometry::Vec3f {
+fn cast_ray(orig: geometry::Vec3f, dir: geometry::Vec3f, spheres: &mut Vec<Sphere>, lights: &mut Vec<Light>, depth: usize, envmap: &Vec<geometry::Vec3<f64>>) -> geometry::Vec3f {
     let mut point: geometry::Vec3f = vec3f(0., 0., 0.);
     let mut n: geometry::Vec3f = vec3f(0., 0., 0.);
     let mut material: Material = Material{diffuse_color: vec3f(0., 0., 0.), albedo: vec4f(0., 0., 0., 0.), specular_exponent: 0., refractive_index: 0.};
 
     if depth > 4 || !scene_intersect(orig, dir, spheres, &mut point, &mut n, &mut material) {
-	return vec3f(0.2, 0.7, 0.8); // background color
+	//return vec3f(0.2, 0.7, 0.8); // background color
+	let a: u32 = num::clamp((((dir.z.atan2(dir.x) / (2.*std::f64::consts::PI) + 0.5) * ENVMAP_WIDTH as f64)) as u32, 0, ENVMAP_WIDTH - 1);
+	let b: u32 = num::clamp((dir.y.acos() / std::f64::consts::PI*ENVMAP_HEIGHT as f64) as u32, 0, ENVMAP_HEIGHT - 1);
+	return envmap[(a + b * ENVMAP_WIDTH) as usize]
     }
     let reflect_dir: geometry::Vec3f = reflect(dir, n);
     let refract_dir: geometry::Vec3f = refract(dir, n, material.refractive_index).normalize();
     let mirror_n: geometry::Vec3f = vec3f(n.x*0.001, n.y*0.001, n.z*0.001);
     let reflect_orig: geometry::Vec3f = if reflect_dir.dot_product(n) < 0. {point - mirror_n} else {point + mirror_n};
     let refract_orig: geometry::Vec3f = if refract_dir.dot_product(n) < 0. {point - mirror_n} else {point + mirror_n};
-    let reflect_color: geometry::Vec3f = cast_ray(reflect_orig, reflect_dir, spheres, lights, depth+1);
-    let refract_color: geometry::Vec3f = cast_ray(refract_orig, refract_dir, spheres, lights, depth+1);
+    let reflect_color: geometry::Vec3f = cast_ray(reflect_orig, reflect_dir, spheres, lights, depth+1, &envmap);
+    let refract_color: geometry::Vec3f = cast_ray(refract_orig, refract_dir, spheres, lights, depth+1, &envmap);
     let mut diffuse_light_intensity: f64 = 0.;
     let mut specular_light_intensity: f64 = 0.;
     for i in 0..lights.len() {
@@ -166,8 +172,8 @@ fn cast_ray(orig: geometry::Vec3f, dir: geometry::Vec3f, spheres: &mut Vec<Spher
 
 fn save_to_file(file_path: &str, frame_buffer: Vec<geometry::Vec3f>) -> std::io::Result<()> {
     let mut file: File = File::create(file_path)?;
-    file.write_all(b"P3\n1024 768\n255\n")?;
-    for i in 0usize..(HEIGHT*WIDTH) as usize {
+    file.write_all(b"P3\n1024 768\n65535\n")?;
+    for i in 0usize..(1024*768) as usize {
 	let mut c: geometry::Vec3f = frame_buffer[i];
 	let max = f64::max(c[0], f64::max(c[1], c[2]));
 	if max>1. {c = vec3f(c.x * (1./max), c.y * (1./max), c.z * (1./max))}
@@ -175,9 +181,9 @@ fn save_to_file(file_path: &str, frame_buffer: Vec<geometry::Vec3f>) -> std::io:
 	    if frame_buffer[i][j] < 0. {
 		write!(file, "0")?;
 	    } else if frame_buffer[i][j] > 1. {
-		write!(file, "255")?;
+		write!(file, "65535")?;
 	    } else {
-		write!(file, "{}", ((255 as f64 * frame_buffer[i][j]) as u16).to_string())?;
+		write!(file, "{}", ((65535 as f64 * frame_buffer[i][j]) as u16).to_string())?;
 	    }
 	    write!(file, " ")?;
 	}
@@ -195,7 +201,7 @@ fn _gradient(mut frame_buffer: Vec<geometry::Vec3f>) -> Vec<geometry::Vec3f> {
     frame_buffer
 }
 
-fn render(spheres: &mut Vec<Sphere>, lights: &mut Vec<Light>) {
+fn render(spheres: &mut Vec<Sphere>, lights: &mut Vec<Light>, envmap: &Vec<geometry::Vec3f>) {
     let file_path = "output.ppm";
     let mut frame_buffer: Vec<geometry::Vec3f> = Vec::with_capacity(WIDTH as usize*HEIGHT as usize);
     for _i in 0..WIDTH*HEIGHT {
@@ -206,11 +212,51 @@ fn render(spheres: &mut Vec<Sphere>, lights: &mut Vec<Light>) {
 	    let xp: f64 = (2.*(i as f64+0.5) as f64/WIDTH as f64-1.)*f64::tan(FOV)*WIDTH as f64/HEIGHT as f64;
 	    let yp: f64 = -(2.*(j as f64+0.5) as f64/HEIGHT as f64-1.)*f64::tan(FOV);
 	    let dir: geometry::Vec3f = geometry::Vec3f{x: xp, y: yp, z: -1.}.normalize();
-	    frame_buffer[(i+j*WIDTH) as usize] = cast_ray(geometry::Vec3f{x: 0., y: 0., z: 0.}, dir, spheres, lights, 0);
+	    frame_buffer[(i+j*WIDTH) as usize] = cast_ray(geometry::Vec3f{x: 0., y: 0., z: 0.}, dir, spheres, lights, 0, &envmap);
 	}
     }
     let _file = save_to_file(file_path, frame_buffer);
     ()
+}
+
+fn build_envmap(file_path: &str) -> Vec<geometry::Vec3f> {
+    let mut op: Vec<geometry::Vec3f> = vec![];
+    let file: String = std::fs::read_to_string(file_path).unwrap();
+    let mut r: f64 = 0.;
+    let mut g: f64 = 0.;
+    let lines: Vec<_> = file.split('\n').collect();
+//    for line in lines {
+    for i in 0..lines.len()-1 {
+	if i >= 3 {
+	    if i % 3 == 0 {
+		r = lines[i].parse::<f64>().unwrap()/65535.;
+	    }
+	    if i % 3 == 1 {
+		g = lines[i].parse::<f64>().unwrap()/65535.;
+	    }
+	    if i % 3 == 2 && i != 2 {
+		op.push(vec3f(r, g, lines[i].parse::<f64>().unwrap()/65535.));
+	    }
+	}
+    }
+//    file.write_all(b"P3\n1024 768\n65535\n")?;
+//    for i in 0usize..(HEIGHT*WIDTH) as usize {
+//	let mut c: geometry::Vec3f = frame_buffer[i];
+//	let max = f64::max(c[0], f64::max(c[1], c[2]));
+//	if max>1. {c = vec3f(c.x * (1./max), c.y * (1./max), c.z * (1./max))}
+//	for j in 0usize..3usize {
+//	    if frame_buffer[i][j] < 0. {
+//		write!(file, "0")?;
+//	    } else if frame_buffer[i][j] > 1. {
+//		write!(file, "65535")?;
+//	    } else {
+//		write!(file, "{}", ((65535 as f64 * frame_buffer[i][j]) as u16).to_string())?;
+//	    }
+//	    write!(file, " ")?;
+//	}
+//	write!(file, "\n")?;
+//    }
+    op
 }
 
 fn main() -> std::io::Result<()> {
@@ -219,6 +265,11 @@ fn main() -> std::io::Result<()> {
 //    assert!(test1.clone()*test2.clone() == geometry::Vec3i{x: 10, y: 10, z: 10});
 //    assert!(test1.clone()+test2.clone() == geometry::Vec3i{x: 7, y: 7, z: 7});
 //    assert!(test1.clone()-test2.clone() == geometry::Vec3i{x: 3, y: 3, z: 3});
+
+    let env_file_path = "envmaps/parsed_bank.ppm";
+    let envmap: Vec<geometry::Vec3f> = build_envmap(env_file_path);
+//    let _file = save_to_file("envmap_output.ppm", envmap);
+    
     let mut spheres: Vec<Sphere> = vec![];
     spheres.push(get_sphere(vec3f(-3., -1.0, -18.), 2., ivory()));
     spheres.push(get_sphere(vec3f(0.5, -1.5, -12.), 2., glass()));
@@ -232,6 +283,6 @@ fn main() -> std::io::Result<()> {
     lights.push(get_light(vec3f(30., 50., -20.), 1.8));
     lights.push(get_light(vec3f(30., 20., 30.), 1.7));
     
-    render(&mut spheres, &mut lights);
+    render(&mut spheres, &mut lights, &envmap);
     Ok(())
 }
