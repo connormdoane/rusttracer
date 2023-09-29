@@ -4,8 +4,8 @@ use std::fs::File;
 use std::io::prelude::*;
 pub mod geometry;
 
-const WIDTH: u32 = 1024;
-const HEIGHT: u32 = 768;
+const WIDTH: u32 = 1920;
+const HEIGHT: u32 = 1080;
 const ENVMAP_WIDTH: u32 = 4096;
 const ENVMAP_HEIGHT: u32 = 2048;
 const FOV: f64 = 0.5;
@@ -172,8 +172,8 @@ fn cast_ray(orig: geometry::Vec3f, dir: geometry::Vec3f, spheres: &mut Vec<Spher
 
 fn save_to_file(file_path: &str, frame_buffer: Vec<geometry::Vec3f>) -> std::io::Result<()> {
     let mut file: File = File::create(file_path)?;
-    file.write_all(b"P3\n1024 768\n65535\n")?;
-    for i in 0usize..(1024*768) as usize {
+    file.write_all(b"P3\n1920 1080\n65535\n")?;
+    for i in 0usize..(1920*1080) as usize {
 	let mut c: geometry::Vec3f = frame_buffer[i];
 	let max = f64::max(c[0], f64::max(c[1], c[2]));
 	if max>1. {c = vec3f(c.x * (1./max), c.y * (1./max), c.z * (1./max))}
